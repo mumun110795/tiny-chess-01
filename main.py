@@ -91,6 +91,7 @@ def um():
 def legal():
  sg=1 if W else -1;out=[]
  for m in gen():
+  if abs(B[m>>7&127])==6:continue
   mk(m)
   if not atk(B.index(6*sg),-sg):out.append(m)
   um()
@@ -116,19 +117,17 @@ def ev():
 class X(Exception):pass
 ND=[0];BUD=24000;TT={};KIL={};HIS={};PTH=set()
 def key():return(bytes([x+6 for x in B]),W,C,E)
-def ordr(ms,tm):
+def ordr(ms,tm,ply):
  def sc(m):
   f=m&127;t=m>>7&127;v=B[t]
   if abs(B[f])==1 and t==E and not v:v=-1
   s=HIS.get(m,0)
   if m==tm:s=1<<24
-  elif v:s=1<<20+V[abs(v)]*10-V[abs(B[f])]//10
-  elif KIL.get(PY)==m:s=1<<18
+  elif v:s=(1<<20)+V[abs(v)]*10-V[abs(B[f])]//10
+  elif KIL.get(ply)==m:s=1<<18
   return(-s,m)
  return sorted(ms,key=sc)
-PY=0
 def qs(a,b,ply):
- global PY
  ND[0]+=1
  if ND[0]%512==0 and ND[0]>BUD:raise X
  sg=1 if W else -1;ic=atk(B.index(6*sg),-sg)
@@ -139,36 +138,48 @@ def qs(a,b,ply):
  ms=legal()
  if not ms:return -100000+ply if ic else st
  if not ic:ms=[m for m in ms if B[m>>7&127]or m>>14 or(abs(B[m&127])==1 and(m>>7&127)==E)]
- ms=ordr(ms,-1);PY=ply
+ ms=ordr(ms,-1,ply)
  for m in ms:
   mk(m);v=-qs(-b,-a,ply+1);um()
   if v>a:
    a=v
    if a>=b:break
  return a
-def sr(d,a,b,ply):
- global PY
+def nmk():
+ global W,E
+ SK.append((B[:],C,E,HF,W));W=not W;E=-1
+def sr(d,a,b,ply,nn=1):
  if d<=0:return qs(a,b,ply)
  ND[0]+=1
  if ND[0]%512==0 and ND[0]>BUD:raise X
  if HF>=100:return 0
+ sg=1 if W else -1;ic=atk(B.index(6*sg),-sg)
+ if ic:d+=1
  k=key()
  if k in PTH:return 0
- e=TT.get(k)
- tm=-1
+ e=TT.get(k);tm=-1
  if e and e[0]>=d:
   if e[2]==0:return e[1]
   if e[2]==1:a=max(a,e[1])
   else:b=min(b,e[1])
   if a>=b:return e[1]
  if e:tm=e[3]
+ if nn and d>=3 and not ic and b<90000 and sum(B.count(x*sg)for x in(2,3,4,5)):
+  nmk();v=-sr(d-3,-b,-b+1,ply+1,0);um()
+  if v>=b:return b
  ms=legal()
- if not ms:
-  sg=1 if W else -1
-  return -100000+ply if atk(B.index(6*sg),-sg)else 0
- ms=ordr(ms,tm);PY=ply;PTH.add(k);best=-1;fl=2;v0=a
- for m in ms:
-  mk(m);v=-sr(d-1,-b,-a,ply+1);um()
+ if not ms:return -100000+ply if ic else 0
+ ms=ordr(ms,tm,ply);PTH.add(k);best=-1;fl=2
+ for i,m in enumerate(ms):
+  qt=not B[m>>7&127]and not m>>14
+  mk(m)
+  if i==0:v=-sr(d-1,-b,-a,ply+1)
+  else:
+   rd=1 if i>=3 and d>=3 and qt and not ic else 0
+   v=-sr(d-1-rd,-a-1,-a,ply+1)
+   if v>a and rd:v=-sr(d-1,-a-1,-a,ply+1)
+   if v>a and v<b:v=-sr(d-1,-b,-a,ply+1)
+  um()
   if v>a:
    a=v;best=m;fl=0
    if a>=b:fl=1;KIL[ply]=m;break
@@ -203,8 +214,13 @@ def best(fn):
  for d in range(1,30):
   try:
    a=-100000;cm=bm
-   for m in ordr(ms,bm):
-    mk(m);v=-sr(d-1,-100000,-a,1)if a>-100000 else -sr(d-1,-100000,100000,1);um()
+   for i,m in enumerate(ordr(ms,bm,0)):
+    mk(m)
+    if i==0:v=-sr(d-1,-100000,100000,1)
+    else:
+     v=-sr(d-1,-a-1,-a,1)
+     if v>a:v=-sr(d-1,-100000,-a,1)
+    um()
     if v>a:a=v;cm=m
    bm=cm
   except X:break
